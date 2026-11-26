@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PlateLog: trainer and client gym app</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#ECEEE9;--ink:#1B2229;--card:#fff;--line:#D3D8D0;--mut:#5B666E;--pri:#27455C;--onpri:#fff;--accent:#B8860B;--plate:#E8B923;--ok:#2E7D4F;--bad:#C8372D;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#13181C;--ink:#E8ECE8;--card:#1C242A;--line:#33404A;--mut:#98A4AB;--pri:#E8B923;--onpri:#13181C;--accent:#E8B923;--ok:#5FC08A;--bad:#F07A70}}
+:root[data-theme="dark"]{--bg:#13181C;--ink:#E8ECE8;--card:#1C242A;--line:#33404A;--mut:#98A4AB;--pri:#E8B923;--onpri:#13181C;--accent:#E8B923;--ok:#5FC08A;--bad:#F07A70}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:500 16px/1.45 Barlow,system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1,h2,h3{font-family:"Barlow Condensed",Impact,sans-serif;margin:0;letter-spacing:.01em}
+h2{font-size:30px;font-weight:700}h3{font-size:21px;font-weight:600}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.brand{font:700 28px "Barlow Condensed",Impact,sans-serif;display:flex;align-items:center;gap:10px}
+.plate{width:26px;height:26px;border-radius:50%;background:var(--plate);box-shadow:inset 0 0 0 7px var(--plate),inset 0 0 0 9px rgba(0,0,0,.35);position:relative}
+.plate:after{content:"";position:absolute;inset:10px;border-radius:50%;background:var(--bg)}
+.seg{display:flex;border:2px solid var(--pri);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:none;color:var(--pri);font:600 16px Barlow,sans-serif;padding:8px 20px;cursor:pointer}
+.seg button.on{background:var(--pri);color:var(--onpri)}
+.who{display:flex;align-items:center;gap:8px;margin-bottom:14px;color:var(--mut)}
+select,input,textarea{font:inherit;color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+input[type=number]{width:72px}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:16px}
+.tabs button{border:0;background:none;color:var(--mut);font:700 20px "Barlow Condensed",sans-serif;padding:8px 14px;cursor:pointer;border-bottom:4px solid transparent;margin-bottom:-2px}
+.tabs button.on{color:var(--ink);border-color:var(--plate)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.pill{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:5px 14px;font:600 15px Barlow,sans-serif;cursor:pointer}
+.pill.on{background:var(--pri);color:var(--onpri);border-color:var(--pri)}
+.btn{border:0;background:var(--pri);color:var(--onpri);font:600 15px Barlow,sans-serif;padding:9px 16px;border-radius:8px;cursor:pointer}
+.btn.ghost{background:none;color:var(--ink);border:1.5px solid var(--line)}
+.row{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.row .n{flex:1}
+.hd{color:var(--mut);font-size:14px;margin-bottom:4px}
+.set{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.set.done{color:var(--ok)}
+.sn{min-width:58px;color:var(--mut)}
+.pickd{width:100%;background:none;border:0;border-top:1px solid var(--line);color:var(--ink);font:inherit;cursor:pointer;text-align:left}
+.big{font:700 44px/1 "Barlow Condensed",sans-serif}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px}
+.stats .card{margin:0}
+.mut{color:var(--mut);font-size:14px}
+.sp{width:100%;height:64px}.ln{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round}.dt{fill:var(--accent)}
+.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:var(--plate)}
+.lift{display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+@media(max-width:520px){.lift{grid-template-columns:1fr}}
+footer{text-align:center;margin:20px 0}
+.linked{border-left:4px solid var(--plate);padding-left:8px}.card.linked{padding-left:12px}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+const KEY='platelog4',DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],FULL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const ago=n=>{const d=new Date();d.setDate(d.getDate()-n);return iso(d)};
+const TODAY=iso(new Date()),TI=(new Date().getDay()+6)%7,TD=DAYS[TI];
+const E=(n,s,r,w,q,ss)=>({n,s,r,w,q,ss});
+const RAW=`#Chest
+Bench Press|Chest|Barbell/Dumbbell/Smith Machine
+Incline Bench Press|Upper Chest|Barbell/Dumbbell
+Decline Bench Press|Lower Chest|Barbell/Dumbbell
+Chest Fly|Chest|Dumbbell/Cable/Pec Deck
+Cable Crossover|Chest|High to Low/Low to High:Upper Chest
+Push-Up|Chest|Standard/Wide Grip/Incline/Decline:Upper Chest
+Chest Dip|Lower Chest|Bodyweight
+Chest Press|Chest|Machine
+#Back
+Lat Pulldown|Back|Wide Grip/Close Grip/Reverse Grip/Neutral Grip
+Pull-Up|Lats|Wide Grip/Close Grip/Neutral Grip
+Chin-Up|Lats, Biceps|Standard
+Barbell Row|Back|Overhand Grip/Underhand Grip
+Pendlay Row|Back|Barbell
+Dumbbell Row|Back|Single Arm/Chest Supported
+Seated Cable Row|Back|Close Grip/Wide Grip
+T-Bar Row|Back|Standard/Chest Supported
+Straight Arm Pulldown|Lats|Rope/Straight Bar
+Deadlift|Back, Hamstrings, Glutes|Conventional/Sumo:Glutes, Legs
+Back Extension|Lower Back|45 Degree
+Superman|Lower Back|Standard
+Bird Dog|Lower Back, Core|Bodyweight
+Reverse Hyperextension|Lower Back, Glutes|Machine
+#Shoulders
+Shoulder Press|Shoulders|Dumbbell/Barbell/Machine
+Arnold Press|Shoulders|Dumbbell
+Lateral Raise|Side Delts|Dumbbell/Cable/Machine
+Front Raise|Front Delts|Dumbbell/Cable/Barbell
+Rear Delt Fly|Rear Delts|Dumbbell/Cable
+Reverse Pec Deck|Rear Delts|Machine
+Face Pull|Rear Delts, Traps|Rope
+Upright Row|Shoulders, Traps|Barbell
+Shrugs|Traps|Dumbbell/Barbell
+Battle Ropes|Shoulders, Core|Alternating Waves
+#Arms
+Bicep Curl|Biceps|Barbell/Dumbbell/EZ Bar
+Hammer Curl|Biceps, Brachialis|Dumbbell/Rope
+Cross Body Hammer Curl|Brachialis|Dumbbell
+Preacher Curl|Biceps|EZ Bar/Dumbbell/Machine
+Concentration Curl|Biceps|Dumbbell
+Incline Curl|Biceps|Dumbbell
+Cable Curl|Biceps|Straight Bar/Rope
+Spider Curl|Biceps|Dumbbell
+Reverse Curl|Brachialis, Forearms|EZ Bar
+Zottman Curl|Biceps, Forearms|Dumbbell
+Drag Curl|Biceps|Barbell
+Triceps Pushdown|Triceps|Rope/Straight Bar/V-Bar/Reverse Grip
+Overhead Extension|Triceps|Dumbbell/Cable
+Skull Crusher|Triceps|EZ Bar/Dumbbell
+Triceps Kickback|Triceps|Dumbbell/Cable
+Close Grip Bench Press|Triceps|Barbell
+Triceps Dip|Triceps|Parallel Bar
+Wrist Curl|Forearms|Barbell/Dumbbell
+Reverse Wrist Curl|Forearms|Barbell
+Farmer's Walk|Forearms, Traps|Dumbbell
+Dead Hang|Forearms, Grip|Standard
+#Legs
+Squat|Quadriceps, Glutes|Back Squat/Front Squat:Quadriceps/Goblet Squat/Sumo Squat:Glutes, Adductors
+Hack Squat|Quadriceps|Machine
+Leg Press|Quadriceps, Glutes|45 Degree/Horizontal:Quadriceps
+Leg Extension|Quadriceps|Single Leg/Both Legs
+Lunge|Quadriceps, Glutes|Forward/Reverse:Glutes, Quadriceps/Walking/Side:Adductors, Glutes
+Bulgarian Split Squat|Quadriceps, Glutes|Dumbbell/Barbell
+Step-Up|Quadriceps, Glutes|Dumbbell
+Leg Curl|Hamstrings|Lying/Seated/Standing
+Romanian Deadlift|Hamstrings, Glutes|Barbell/Dumbbell/Single Leg
+Stiff Leg Deadlift|Hamstrings|Barbell
+Good Morning|Hamstrings, Lower Back|Barbell
+Nordic Curl|Hamstrings|Bodyweight
+Hip Thrust|Glutes|Barbell/Dumbbell/Smith Machine
+Glute Bridge|Glutes|Bodyweight/Weighted
+Glute Kickback|Glutes|Cable/Machine
+Hip Abduction|Glute Medius|Machine/Resistance Band
+Cable Pull Through|Glutes, Hamstrings|Rope
+Frog Pumps|Glutes|Bodyweight
+Calf Raise|Calves|Standing:Gastrocnemius/Seated:Soleus/Single Leg/Leg Press
+Kettlebell Swing|Glutes, Hamstrings|Two Hand/Single Hand
+#Core
+Crunch|Abs|Standard/Reverse:Lower Abs/Cable
+Sit-Up|Abs|Standard/Decline/Weighted
+Leg Raise|Lower Abs|Hanging/Lying
+Knee Raise|Lower Abs|Captain Chair
+Ab Wheel Rollout|Abs, Core|Kneeling
+V-Up|Abs|Standard
+Russian Twist|Obliques|Weighted
+Side Bend|Obliques|Dumbbell
+Woodchopper|Obliques|High to Low/Low to High
+Side Plank|Obliques, Core|Standard
+Bicycle Crunch|Abs, Obliques|Standard
+Pallof Press|Core, Obliques|Cable
+#Cardio
+Running|Cardio|Treadmill/Outdoor/Intervals
+Walking|Cardio|Outdoor/Treadmill/Incline
+Cycling|Cardio|Stationary Bike/Outdoor/Spin Class
+Rowing Machine|Cardio|Steady Pace/Intervals
+Elliptical|Cardio|Steady Pace/Intervals
+Stair Climber|Cardio|Steady Pace
+Jump Rope|Cardio|Steady Pace/Intervals
+Swimming|Cardio|Freestyle/Mixed Strokes
+HIIT Circuit|Cardio|Bodyweight/Mixed
+#Full Body
+Burpee|Full Body|Standard
+Thruster|Full Body|Barbell/Dumbbell
+Turkish Get-Up|Full Body|Kettlebell
+Clean and Press|Full Body|Barbell`;
+const LIB={};let cat;
+RAW.split('\n').forEach(l=>{if(l[0]=='#'){cat=l.slice(1);LIB[cat]=[];return}const[n,m,v]=l.split('|');LIB[cat].push({c:cat=='Cardio',n,m,v:v.split('/').map(x=>{const[a,b]=x.split(':');return{v:a,m:b||m}})})});
+const EX=n=>{for(const c in LIB){const x=LIB[c].find(e=>e.n==n);if(x)return x}};
+const vars=n=>EX(n)?EX(n).v:[{v:'Standard',m:''}];
+const muscle=(n,q)=>{const x=EX(n),v=x&&x.v.find(a=>a.v==q);return v?v.m:x?x.m:''};
+const opts=cur=>(EX(cur)||!cur?'':`<option selected>${esc(cur)}</option>`)+Object.keys(LIB).map(c=>`<optgroup label="${c}">${LIB[c].map(e=>`<option ${e.n==cur?'selected':''}>${e.n}</option>`).join('')}</optgroup>`).join('');
+const isC=n=>{const x=EX(n);return !!(x&&x.c)};
+const CMET={'Running':9.8,'Walking':3.8,'Cycling':7.5,'Rowing Machine':7,'Elliptical':5,'Stair Climber':8.8,'Jump Rope':11,'Swimming':7,'HIIT Circuit':9};
+const cardioH=c=>{const cut=ago(6),x=c.logs.filter(l=>l.cardio&&l.d>=cut);return x.length?`<div class="lift"><div><b>Cardio, last 7 days</b></div><div>${x.reduce((a,l)=>a+l.r,0)} min, ${Math.round(x.reduce((a,l)=>a+l.w,0)*10)/10} km in ${x.length} sessions</div></div>`:''};
+const DISH=`Plain Dosa (dosai)|135|1 piece
+Masala Dosa|280|1 piece
+Rava Dosa|190|1 piece
+Ghee Roast Dosa|250|1 piece
+Set Dosa|80|1 piece
+Neer Dosa|70|1 piece
+Egg Dosa|200|1 piece
+Pesarattu (green gram dosa)|140|1 piece
+Adai|190|1 piece
+Onion Uttapam|190|1 piece
+Idli|58|1 piece
+Medu Vada (ulundu vada)|135|1 piece
+Ven Pongal|280|1 bowl (200 g)
+Sweet Pongal (sakkarai pongal)|250|1 katori
+Upma (rava upma)|240|1 bowl (200 g)
+Appam (palappam)|120|1 piece
+Idiyappam (string hoppers)|60|1 piece
+Puttu|180|1 cup
+Akki Roti|150|1 piece
+Chapati|100|1 piece
+Parotta (Kerala or Tamil style)|300|1 piece
+Kothu Parotta|550|1 plate
+Plain Rice (steamed)|200|1 cup cooked
+Lemon Rice (chitranna)|280|1 cup
+Tamarind Rice (puliyodarai)|310|1 cup
+Coconut Rice|320|1 cup
+Tomato Rice|270|1 cup
+Curd Rice (thayir sadam)|230|1 cup
+Sambar Rice|300|1 bowl
+Bisi Bele Bath|320|1 bowl
+Chicken Biryani|500|1 plate
+Mutton Biryani|580|1 plate
+Veg Biryani|400|1 plate
+Full South Indian Meals (veg)|650|1 plate
+Sambar|70|1 katori
+Rasam|40|1 katori
+Kootu|100|1 katori
+Poriyal (vegetable stir fry)|90|1 katori
+Avial|130|1 katori
+Vatha Kuzhambu|120|1 katori
+Mor Kuzhambu|100|1 katori
+Keerai Masiyal (spinach)|90|1 katori
+Kerala Fish Curry (meen curry)|170|1 katori
+Chicken Chettinad|230|1 katori
+Egg Curry (muttai kuzhambu)|190|1 katori
+Chicken 65|290|1 plate (100 g)
+Fish Fry (meen varuval)|200|1 piece
+Mutton Sukka|260|1 katori
+Coconut Chutney|50|2 tbsp
+Peanut Chutney|60|2 tbsp
+Tomato Chutney|30|2 tbsp
+Idli Podi with oil (milagai podi)|50|1 tsp
+Sundal (chickpea)|150|1 katori
+Mysore Bonda|100|1 piece
+Potato Bonda|150|1 piece
+Mirchi Bajji|90|1 piece
+Banana Chips (nendran)|150|1 handful (30 g)
+Murukku|75|1 piece
+Semiya Payasam|200|1 katori
+Rava Kesari|200|1 piece
+Mysore Pak|220|1 piece
+Filter Coffee (with milk and sugar)|80|1 cup
+Tea (with milk and sugar)|70|1 cup
+Buttermilk (neer mor)|40|1 glass
+Tender Coconut Water|45|1 glass`.split('\n').map(l=>{const a=l.split('|');return[a[0],+a[1],a[2]]});
+let fqv='',pk=null;
+const fsHtml=()=>{if(pk)return`<div class="set"><span style="flex:1"><b>${esc(pk.d[0])}</b><div class="mut">${esc(pk.d[2])} is about ${pk.d[1]} kcal</div></span><label class="mut">Servings <input type="number" id="fq2" min="0.5" step="0.5" value="${pk.q}"></label><b><span id="ft">${Math.round(pk.d[1]*pk.q)}</span> kcal</b><button class="btn" data-a="addd">Add</button></div>`;
+ const w=fqv.toLowerCase().split(/\s+/).filter(Boolean);if(!w.length)return'<p class="mut">Type a dish name to see its approximate calories. Values are typical for a home-style serving and change with oil and portion size.</p>';
+ const m=DISH.filter(d=>w.every(x=>d[0].toLowerCase().includes(x))).slice(0,6);
+ return m.length?m.map(d=>`<button class="set pickd" data-a="pick" data-i="${DISH.indexOf(d)}"><span style="flex:1">${esc(d[0])}</span><span class="mut">${d[1]} kcal per ${esc(d[2])}</span></button>`).join(''):'<p class="mut">No match. Try another spelling, or add it yourself below.</p>'};
+const vopts=(n,q)=>vars(n).map(a=>`<option ${a.v==(q||vars(n)[0].v)?'selected':''}>${a.v}</option>`).join('');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hp=s=>{let h=5381;for(const ch of 'pl$'+s)h=((h<<5)+h+ch.charCodeAt(0))|0;return 'h'+(h>>>0).toString(36)};
+const mkcode=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let r='';for(let i=0;i<6;i++)r+=a[Math.floor(Math.random()*a.length)];return r};
+function newClient(tid,name,email,wt,inv){const p={};DAYS.forEach(d=>p[d]=[]);return{id:Date.now()+Math.floor(Math.random()*1e4),tid,uid:null,email,name,invite:inv||mkcode(),mins:45,plan:p,diet:{kcal:2200,protein:120,note:''},logs:[],food:[],weights:[{d:TODAY,v:wt}]}}
+function seed(){
+ const logs=[];
+ for(let k=1;k<=6;k++){logs.push({d:ago(k*3),ex:'Bench Press',q:'Barbell',s:1,r:8,w:60-k*2.5},{d:ago(k*3),ex:'Squat',q:'Back Squat',s:1,r:8,w:80-k*5})}
+ return{users:[{id:'u1',role:'t',name:'Coach Ravi',email:'coach@demo.com',pw:hp('demo123')},{id:'u2',role:'c',name:'Aarav Kumar',email:'aarav@demo.com',pw:hp('demo123')},{id:'u3',role:'c',name:'Meera Nair',email:'meera@demo.com',pw:hp('demo123')}],clients:[
+ {id:1,tid:'u1',uid:'u2',email:'aarav@demo.com',name:'Aarav Kumar',mins:45,
+  plan:{Mon:[E('Bench Press',4,8,60,'Barbell'),E('Incline Bench Press',3,10,22,'Dumbbell',true),E('Triceps Pushdown',3,12,25,'Rope')],Tue:[E('Squat',4,8,80,'Back Squat'),E('Leg Press',3,12,120,'45 Degree'),E('Calf Raise',3,15,40,'Standing')],Wed:[],Thu:[E('Deadlift',3,5,100,'Conventional'),E('Barbell Row',4,8,55,'Overhand Grip',true),E('Lat Pulldown',3,10,50,'Wide Grip'),E('Walking',1,20,1.5,'Incline')],Fri:[E('Shoulder Press',4,8,35,'Dumbbell'),E('Lateral Raise',3,12,8,'Dumbbell',true),E('Bicep Curl',3,12,12,'Dumbbell')],Sat:[E('Squat',3,10,70,'Back Squat'),E('Bench Press',3,10,50,'Barbell')],Sun:[]},
+  diet:{kcal:2400,protein:150,note:'Eat protein within 1 hour after training. Rice portion: 1 cup at lunch.'},
+  logs,food:[{d:TODAY,n:'Idli (3) with sambar',k:280}],
+  weights:[[35,85],[28,84.4],[21,84],[14,83.2],[7,82.8],[1,82.4]].map(a=>({d:ago(a[0]),v:a[1]}))},
+ {id:2,tid:'u1',uid:'u3',email:'meera@demo.com',name:'Meera Nair',mins:40,
+  plan:{Mon:[E('Squat',3,12,16,'Goblet Squat'),E('Dumbbell Row',3,12,10,'Single Arm')],Tue:[],Wed:[E('Hip Thrust',3,10,50,'Barbell'),E('Push-Up',3,10,0,'Standard')],Thu:[],Fri:[E('Romanian Deadlift',3,10,30,'Barbell'),E('Lat Pulldown',3,12,30,'Wide Grip')],Sat:[],Sun:[]},
+  diet:{kcal:1700,protein:100,note:'Add one fruit and one curd serving daily.'},
+  logs:[{d:ago(2),ex:'Hip Thrust',q:'Barbell',s:1,r:10,w:45},{d:ago(9),ex:'Hip Thrust',q:'Barbell',s:1,r:10,w:42.5},{d:ago(16),ex:'Hip Thrust',q:'Barbell',s:1,r:10,w:40}],food:[],
+  weights:[[28,64.5],[14,63.8],[2,63.2]].map(a=>({d:ago(a[0]),v:a[1]}))},newClient('u1','Karthik S','karthik@demo.com',78,'KARTH7')]};}
+let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.users)S=seed();
+const save=()=>{if(cloud)return cloudSave();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+let me=null;try{me=S.users.find(u=>u.id==localStorage.getItem(KEY+'-me'))||null}catch(e){}
+let am='in',ar='t',amsg='',af={};
+let cloud=false,db=null,uid=null,loading=true,bn='',lastSig='',pend=false,ini=false,lo=false,P={},CM={},DM={},got={};const sy={},wq={};
+let role='t',cid=0,tt='clients',ct='today',day=TD,draft={};
+const mine=()=>S.clients.filter(x=>me.role=='t'?x.tid==me.id:x.uid==me.id);
+const C=()=>mine().find(x=>x.id==cid)||mine()[0];
+const bw=c=>c.weights[c.weights.length-1].v;
+const todaySets=c=>c.logs.filter(l=>l.d==TODAY).length;
+const eaten=c=>c.food.filter(f=>f.d==TODAY).reduce((a,f)=>a+f.k,0);
+const burned=c=>{const T=c.logs.filter(l=>l.d==TODAY),k=3.5*bw(c)/200;return Math.round((T.some(l=>!l.cardio)?5*k*c.mins:0)+T.filter(l=>l.cardio).reduce((a,l)=>a+(CMET[l.ex]||7)*k*l.r,0))};
+function spark(v){if(v.length<2)return'<div class="mut">Log at least two sessions to see a trend.</div>';
+ const w=260,h=64,mn=Math.min(...v),mx=Math.max(...v),r=mx-mn||1;
+ const p=v.map((y,i)=>[8+i*(w-16)/(v.length-1),h-8-(y-mn)/r*(h-16)]);
+ return`<svg class="sp" viewBox="0 0 ${w} ${h}" role="img" aria-label="Trend from ${v[0]} to ${v[v.length-1]}"><polyline class="ln" points="${p.map(q=>q.join(',')).join(' ')}"/>${p.map(q=>`<circle class="dt" cx="${q[0]}" cy="${q[1]}" r="3"/>`).join('')}</svg>`}
+function lifts(c){const m={};c.logs.forEach(l=>{if(l.cardio)return;const kk=l.ex+(l.q?' ('+l.q+')':''),o=m[kk]=m[kk]||{};o[l.d]=Math.max(o[l.d]||0,l.w)});
+ return Object.entries(m).map(([n,o])=>[n,Object.keys(o).sort().map(d=>o[d])])}
+function liftsHtml(c){return liftsH(c)+cardioH(c)}
+function liftsH(c){const L=lifts(c);if(!L.length)return'<p class="mut">No sets logged yet.</p>';
+ return L.map(([n,v])=>{const dl=v[v.length-1]-v[0];return`<div class="lift"><div><b>${esc(n)}</b><div class="mut">${v[v.length-1]} kg best${v.length>1?` (${dl>=0?'+':''}${dl} kg)`:''}</div></div>${spark(v)}</div>`}).join('')}
+function head(){const cs=mine(),c=C();return(bn?`<p role="alert" style="color:var(--bad)">${esc(bn)}</p>`:'')+`<header><div class="brand"><span class="plate"></span>PlateLog</div><div class="who" style="margin:0"><span>${esc(me.name)} <span class="mut">(${me.role=='t'?'trainer':'client'})</span></span><button class="btn ghost" data-a="logout">${cloud&&lo?'Confirm log out':'Log out'}</button></div></header>`
++(me.role=='t'&&cs.length?`<div class="who"><label>Client <select data-f="pick">${cs.map(x=>`<option value="${x.id}" ${c&&x.id==c.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label></div>`:'')
++(me.role=='c'&&c?`<div class="who">Your trainer: ${esc((S.users.find(u=>u.id==c.tid)||{}).name||'')}</div>`:'')}
+const tabs=(list,cur)=>`<div class="tabs">${list.map(([k,l])=>`<button data-a="tab" data-v="${k}" class="${k==cur?'on':''}">${l}</button>`).join('')}</div>`;
+
+const TT=[['clients','Clients'],['workout','Workout'],['diet','Diet'],['progress','Progress']];
+function trainer(){const c=C();if(!c||tt=='clients')return tabs(TT,'clients')+clientsHtml();let h=tabs(TT,tt);
+ if(tt=='workout'){const L=c.plan[day]||[];
+  h+=`<div class="pills">${DAYS.map(d=>`<button class="pill ${d==day?'on':''}" data-a="day" data-v="${d}">${d}${(c.plan[d]||[]).length?'':' (rest)'}</button>`).join('')}</div>
+  <div class="card"><h3>${FULL[DAYS.indexOf(day)]} for ${esc(c.name)}</h3>
+  ${L.some(e=>!isC(e.n))?`<div class="row hd"><span class="n">Exercise</span><span style="width:72px">Sets</span><span style="width:72px">Reps</span><span style="width:72px">Kg</span><span style="width:34px"></span></div>`:L.length?'':'<p class="mut">Rest day. Add an exercise to make this a training day.</p>'}
+  ${L.map((e,i)=>{const lk=e.ss||(i>0&&L[i-1].ss);return`<div class="${lk?'linked':''}"><div class="row"><select class="n" data-f="ex" data-i="${i}" data-k="n" aria-label="Exercise">${opts(e.n)}</select>${isC(e.n)?'':`<input type="number" data-f="ex" data-i="${i}" data-k="s" value="${e.s}" aria-label="Sets"><input type="number" data-f="ex" data-i="${i}" data-k="r" value="${e.r}" aria-label="Reps"><input type="number" step="0.5" data-f="ex" data-i="${i}" data-k="w" value="${e.w}" aria-label="Weight in kg">`}<button class="btn ghost" data-a="rm" data-i="${i}" aria-label="Remove exercise">✕</button></div><div class="row" style="margin:-2px 0 14px 12px;flex-wrap:wrap"><select data-f="ex" data-i="${i}" data-k="q" aria-label="Variation">${vopts(e.n,e.q)}</select><span class="mut">${esc(muscle(e.n,e.q))}</span>${isC(e.n)?`<label class="mut"><input type="number" data-f="ex" data-i="${i}" data-k="r" value="${e.r}" aria-label="Minutes"> min</label><label class="mut"><input type="number" step="0.1" data-f="ex" data-i="${i}" data-k="w" value="${e.w}" aria-label="Distance in km"> km</label>`:''}${i<L.length-1?`<label class="mut"><input type="checkbox" data-f="ss" data-i="${i}" ${e.ss?'checked':''}> Superset with next</label>`:''}</div></div>`}).join('')}
+  <select data-f="addex" aria-label="Add exercise" style="width:100%"><option value="">+ Choose an exercise to add…</option>${opts('')}</select></div>
+  <p class="mut">Changes save automatically and show up in the client app straight away.</p>`}
+ if(tt=='diet')h+=`<div class="card"><h3>Daily targets for ${esc(c.name)}</h3>
+  <div class="row" style="margin-top:10px"><label>Calories <input type="number" data-f="diet" data-k="kcal" value="${c.diet.kcal}"></label><label>Protein (g) <input type="number" data-f="diet" data-k="protein" value="${c.diet.protein}"></label></div>
+  <label class="mut">Meal guidance<br><textarea data-f="diet" data-k="note" rows="4" style="width:100%">${esc(c.diet.note)}</textarea></label></div>
+  <div class="card"><h3>Eaten today</h3><p class="mut">Shared by the client</p><div class="big">${eaten(c)} <span class="mut">of ${c.diet.kcal} kcal</span></div><div class="bar"><i style="width:${Math.min(100,eaten(c)/c.diet.kcal*100)}%"></i></div></div>`;
+ if(tt=='progress'){const planned=DAYS.filter(d=>(c.plan[d]||[]).length).length,cut=ago(6);
+  const done=new Set(c.logs.filter(l=>l.d>=cut).map(l=>l.d)).size,pct=planned?Math.min(100,Math.round(done/planned*100)):0;
+  h+=`<div class="stats"><div class="card"><div class="mut">Body weight</div><div class="big">${bw(c)} kg</div></div><div class="card"><div class="mut">Sessions this week</div><div class="big">${done}/${planned}</div><div class="bar"><i style="width:${pct}%"></i></div></div><div class="card"><div class="mut">Today: eaten / burned</div><div class="big">${eaten(c)} / ${burned(c)}</div></div></div>
+  <div class="card"><h3>Body weight trend</h3>${spark(c.weights.map(w=>w.v))}</div>
+  <div class="card"><h3>Strength by lift</h3>${liftsHtml(c)}</div>
+  ${done<2&&planned?`<div class="card" style="border-color:var(--bad)"><b>Low adherence.</b> ${esc(c.name)} has trained ${done} of ${planned} planned days this week.</div>`:''}`}
+ return h}
+
+function client(){const c=C();if(!c)return'<p class="mut">No trainer is linked to this account yet. Ask your trainer for an invite code.</p>';let h=tabs([['today','Today'],['food','Food'],['me','Progress']],ct);
+ if(ct=='today'){const L=c.plan[TD]||[];h+=`<h2>${FULL[TI]}</h2>`;
+  if(!L.length)h+='<p class="mut">Rest day. Log your food and weight instead.</p>';
+  const sr=(i,s,nm)=>{const e=L[i],lg=c.logs.find(l=>l.d==TODAY&&l.ex==e.n&&l.q==e.q&&l.s==s),k=i+'-'+s,lab=nm?`<span class="sn" style="flex:1;min-width:130px">${esc(e.n)}, set ${s}</span>`:`<span class="sn">${isC(e.n)?'Session':'Set '+s}</span>`;
+   return lg?`<div class="set done">${lab}<b>${isC(e.n)?`${lg.r} min, ${lg.w} km`:`${lg.r} reps × ${lg.w} kg`}</b><button class="btn ghost" data-a="unlog" data-e="${i}" data-s="${s}">Undo</button></div>`
+   :`<div class="set">${lab}<input type="number" data-f="dr" data-k="${k}-r" value="${draft[k+'-r']??e.r}" aria-label="${isC(e.n)?'Minutes':'Reps'}"> ${isC(e.n)?'min':'reps'} <input type="number" step="0.5" data-f="dr" data-k="${k}-w" value="${draft[k+'-w']??e.w}" aria-label="${isC(e.n)?'Distance in km':'Weight in kg'}"> ${isC(e.n)?'km':'kg'} <button class="btn" data-a="log" data-e="${i}" data-s="${s}">Log set</button></div>`};
+  const G=[];L.forEach((e,i)=>{if(i>0&&L[i-1].ss)G[G.length-1].push(i);else G.push([i])});
+  G.forEach(g=>{const m=g.length>1;
+   h+=`<div class="card${m?' linked':''}">${m?'<h3>Superset</h3><div class="mut">Do one set of each exercise back to back, then rest.</div>':''}`;
+   g.forEach(i=>{const e=L[i],d=`<div class="mut">${esc(e.q)} for ${esc(muscle(e.n,e.q))}. Target ${isC(e.n)?`${e.r} min`+(e.w?`, ${e.w} km`:''):`${e.s} × ${e.r} at ${e.w} kg`}</div>`;h+=m?`<div style="margin-top:10px"><b>${esc(e.n)}</b>${d}</div>`:`<h3>${esc(e.n)}</h3>${d}`});
+   if(m){for(let s=1;s<=Math.max(...g.map(i=>L[i].s));s++)g.forEach(i=>{if(s<=L[i].s)h+=sr(i,s,1)})}else for(let s=1;s<=L[g[0]].s;s++)h+=sr(g[0],s,0);
+   h+='</div>'})}
+ if(ct=='food'){const eat=eaten(c),bn=burned(c),net=eat-bn;
+  h+=`<div class="stats"><div class="card"><div class="mut">Eaten</div><div class="big">${eat}</div></div><div class="card"><div class="mut">Burned (estimate)</div><div class="big">${bn}</div></div><div class="card"><div class="mut">Net of ${c.diet.kcal} target</div><div class="big">${net}</div></div></div>
+  <div class="card"><h3>Add food</h3><input id="fq" value="${esc(fqv)}" placeholder="Search a South Indian dish, e.g. masala dosa" autocomplete="off" aria-label="Search dish" style="width:100%;margin:8px 0"><div id="fs">${fsHtml()}</div><p class="mut" style="margin-top:12px">Not in the list? Add it yourself:</p><div class="row"><input class="n" id="fn" placeholder="Food name"><input type="number" id="fk" placeholder="kcal"><button class="btn" data-a="food">Add</button></div>
+  ${c.food.filter(f=>f.d==TODAY).map((f,i)=>`<div class="set"><span style="flex:1">${esc(f.n)}</span><b>${f.k} kcal</b><button class="btn ghost" data-a="rmfood" data-i="${c.food.indexOf(f)}" aria-label="Remove">✕</button></div>`).join('')||'<p class="mut">Nothing logged today. Add your first meal above.</p>'}</div>
+  <div class="card"><h3>Workout burn</h3><p class="mut">Estimated from body weight and time. Strength training counts once you log a set, and cardio is added from the minutes you log.</p><label>Strength minutes <input type="number" data-f="mins" value="${c.mins}"></label></div>
+  <p class="mut">Your trainer sees these totals.</p>`}
+ if(ct=='me')h+=`<div class="card"><h3>Update body weight</h3><div class="row" style="margin-top:8px"><input type="number" step="0.1" id="bw" value="${bw(c)}"> kg <button class="btn" data-a="weight">Save weight</button></div>${spark(c.weights.map(w=>w.v))}</div><div class="card"><h3>Your lifts</h3>${liftsHtml(c)}</div>`;
+ return h}
+
+function render(){if(!me){document.getElementById('app').innerHTML=authHtml();return}document.getElementById('app').innerHTML=head()+(role=='t'?trainer():client())+(cloud?'':'<footer><button class="btn ghost" data-a="reset">Reset demo data</button></footer>')}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-a]');if(!b)return;if(!me){auth(b.dataset.a,b.dataset.v);return}const a=b.dataset.a,c=C(),v=b.dataset.v;
+ if(a=='logout'){if(cloud){if(!lo){lo=true;render();return}lo=false;cloudOut();return}me=null;try{localStorage.removeItem(KEY+'-me')}catch(e){}}
+ else if(a=='open'){cid=+v;tt='workout'}
+ else if(a=='copy'){try{navigator.clipboard.writeText(v)}catch(e){}b.textContent='Copied';return}
+ else if(a=='addc'){const n=document.getElementById('nc-n').value.trim();if(!n)return;const k=newClient(me.id,n,document.getElementById('nc-e').value.trim().toLowerCase(),+document.getElementById('nc-w').value||70);S.clients.push(k);if(!cid)cid=k.id}
+ else if(a=='tab'){role=='t'?tt=v:ct=v}
+ else if(a=='day')day=v;
+ else if(a=='add'){(c.plan[day]=c.plan[day]||[]).push(E('New exercise',3,10,20))}
+ else if(a=='rm')c.plan[day].splice(+b.dataset.i,1);
+ else if(a=='log'){const e=c.plan[TD][+b.dataset.e],s=+b.dataset.s,k=b.dataset.e+'-'+s;
+  c.logs.push({d:TODAY,ex:e.n,q:e.q,cardio:isC(e.n),s,r:+(draft[k+'-r']??e.r),w:+(draft[k+'-w']??e.w)})}
+ else if(a=='unlog'){const e=c.plan[TD][+b.dataset.e];c.logs=c.logs.filter(l=>!(l.d==TODAY&&l.ex==e.n&&l.q==e.q&&l.s==+b.dataset.s))}
+ else if(a=='food'){const n=document.getElementById('fn').value.trim(),k=+document.getElementById('fk').value;if(!n||!(k>0))return;c.food.push({d:TODAY,n,k})}
+ else if(a=='pick')pk={d:DISH[+b.dataset.i],q:1};
+ else if(a=='addd'){if(!pk||!(pk.q>0))return;c.food.push({d:TODAY,n:pk.d[0]+' ('+pk.q+' × '+pk.d[2]+')',k:Math.round(pk.d[1]*pk.q)});pk=null;fqv=''}
+ else if(a=='rmfood')c.food.splice(+b.dataset.i,1);
+ else if(a=='weight'){const x=+document.getElementById('bw').value;if(!(x>0))return;const l=c.weights[c.weights.length-1];l.d==TODAY?l.v=x:c.weights.push({d:TODAY,v:x})}
+ else if(a=='reset'){S=seed();draft={};me=null;try{localStorage.removeItem(KEY+'-me')}catch(e){}}
+ save();render()});
+document.addEventListener('change',ev=>{const t=ev.target,f=t.dataset.f;if(!f||!me)return;const c=C();
+ if(f=='pick'){cid=+t.value;draft={};render();return}
+ if(f=='addex'){if(!t.value)return;(c.plan[day]=c.plan[day]||[]).push(isC(t.value)?E(t.value,1,20,0,vars(t.value)[0].v):E(t.value,3,10,0,vars(t.value)[0].v));save();render();return}
+ if(f=='ex'){const e=c.plan[day][+t.dataset.i],k=t.dataset.k;if(k=='n'){const was=isC(e.n);e.n=t.value;e.q=vars(e.n)[0].v;if(was!=isC(e.n)){e.s=isC(e.n)?1:3;e.r=isC(e.n)?20:10;e.w=0}save();render();return}if(k=='q'){e.q=t.value;save();render();return}e[k]=+t.value}
+ else if(f=='ss'){c.plan[day][+t.dataset.i].ss=t.checked;save();render();return}
+ else if(f=='diet'){const k=t.dataset.k;c.diet[k]=k=='note'?t.value:+t.value}
+ else if(f=='mins'){c.mins=+t.value;save();render();return}
+ else if(f=='dr')draft[t.dataset.k]=t.value;
+ save()});
+document.addEventListener('input',ev=>{const t=ev.target;
+ if(t.id&&t.id.slice(0,2)=='a-'){af[t.id]=t.value}
+ else if(t.id=='fq'){fqv=t.value;pk=null;document.getElementById('fs').innerHTML=fsHtml()}
+ else if(t.id=='fq2'&&pk){pk.q=+t.value||0;document.getElementById('ft').textContent=Math.round(pk.d[1]*pk.q)}});
+function clientsHtml(){const cs=mine();
+return`<div class="card"><h3>Add a client</h3><p class="mut">You get an invite code for each client. They choose “I’m a client” on the sign-up page and enter the code to link their account to you.</p>
+<div class="row" style="margin-top:8px;flex-wrap:wrap"><input class="n" id="nc-n" placeholder="Client name" style="min-width:150px"><input id="nc-e" type="email" placeholder="Email (optional)" style="min-width:150px"><input type="number" id="nc-w" step="0.1" placeholder="Weight kg" style="width:110px"><button class="btn" data-a="addc">Add client</button></div></div>
+${cs.map(x=>`<div class="card"><div class="row" style="flex-wrap:wrap"><div class="n"><b>${esc(x.name)}</b><div class="mut">${x.uid?'Connected':'Invite pending'}${x.email?', '+esc(x.email):''}</div></div>${x.uid?'':`<span class="big" style="font-size:28px">${x.invite}</span><button class="btn ghost" data-a="copy" data-v="${x.invite}">Copy code</button>`}<button class="btn" data-a="open" data-v="${x.id}">Open</button></div></div>`).join('')||'<p class="mut">No clients yet. Add your first client above.</p>'}`}
+function authHtml(){if(cloud)return loading?'<p class="mut" style="padding:24px">Loading your data…</p>':setupHtml();const v=k=>esc(af[k]||'');return`<header><div class="brand"><span class="plate"></span>PlateLog</div></header>
+<div class="card" style="max-width:440px;margin:24px auto"><div class="tabs"><button data-a="am" data-v="in" class="${am=='in'?'on':''}">Log in</button><button data-a="am" data-v="up" class="${am=='up'?'on':''}">Sign up</button></div>
+${am=='up'?`<div class="pills"><button class="pill ${ar=='t'?'on':''}" data-a="ar" data-v="t">I’m a trainer</button><button class="pill ${ar=='c'?'on':''}" data-a="ar" data-v="c">I’m a client</button></div><p><label>Name<br><input id="a-n" value="${v('a-n')}" style="width:100%" autocomplete="name"></label></p>`:''}
+<p><label>Email<br><input id="a-e" type="email" value="${v('a-e')}" style="width:100%" autocomplete="email"></label></p>
+<p><label>Password<br><input id="a-p" type="password" style="width:100%" autocomplete="${am=='in'?'current-password':'new-password'}"></label></p>
+${am=='up'&&ar=='c'?`<p><label>Invite code from your trainer<br><input id="a-c" value="${v('a-c')}" style="width:100%;text-transform:uppercase" autocomplete="off"></label></p>`:''}
+${amsg?`<p role="alert" style="color:var(--bad)">${esc(amsg)}</p>`:''}
+<button class="btn" style="width:100%" data-a="go">${am=='in'?'Log in':'Create account'}</button>
+<hr style="border:0;border-top:1px solid var(--line);margin:18px 0"><p class="mut">Try the demo (password demo123). To test linking, sign up as a client with code KARTH7.</p><div class="row"><button class="btn ghost" data-a="demo" data-v="coach@demo.com">Demo trainer</button><button class="btn ghost" data-a="demo" data-v="aarav@demo.com">Demo client</button></div>
+<p class="mut">Accounts in this prototype live in this browser only. A real launch needs a server so trainers and clients on different phones can connect.</p></div>`}
+function enter(u){me=u;try{localStorage.setItem(KEY+'-me',u.id)}catch(e){}role=u.role;cid=(mine()[0]||{}).id||0;tt=role=='t'?'clients':'workout';ct='today';draft={};af={};amsg='';save();render()}
+function auth(a,v){const fail=m=>{amsg=m;af['a-p']='';render()};
+ if(cloud){if(a=='ar'){ar=v;amsg='';render()}
+  else if(a=='go'){const n=(af['a-n']||'').trim();if(!n)return fail('Enter your name.');let cl=null;
+   if(ar=='c'){const code=(af['a-c']||'').trim().toUpperCase();cl=S.clients.find(x=>x.invite==code&&!x.uid);if(!cl)return fail('That invite code is not valid or was already used. Ask your trainer for the code.')}
+   if(cl){cl.uid=uid;cl.invite=null;put('clients/'+cl.id,pick(cl,MK))}(cl?wq['clients/'+cl.id]:Promise.resolve()).then(()=>db.doc('profiles/'+uid).set({role:ar,name:n})).catch(cloudErr)}
+  return}
+ if(a=='am'){am=v;amsg='';render()}
+ else if(a=='ar'){ar=v;amsg='';render()}
+ else if(a=='demo'){const u=S.users.find(x=>x.email==v);if(u)enter(u)}
+ else if(a=='go'){const e=(af['a-e']||'').trim().toLowerCase(),p=af['a-p']||'';
+  if(am=='in'){const u=S.users.find(x=>x.email==e&&x.pw==hp(p));return u?enter(u):fail('Email or password is incorrect.')}
+  const n=(af['a-n']||'').trim();
+  if(!n||!e||p.length<6)return fail('Enter your name, an email, and a password of at least 6 characters.');
+  if(S.users.some(x=>x.email==e))return fail('That email already has an account. Log in instead.');
+  let cl=null;
+  if(ar=='c'){const code=(af['a-c']||'').trim().toUpperCase();cl=S.clients.find(x=>x.invite==code&&!x.uid);if(!cl)return fail('That invite code is not valid or was already used. Ask your trainer for the code.')}
+  const u={id:'u'+Date.now(),role:ar,name:n,email:e,pw:hp(p)};S.users.push(u);if(cl){cl.uid=u.id;cl.invite=null}enter(u)}}
+document.addEventListener('keydown',ev=>{if(ev.key=='Enter'&&!me&&ev.target.id&&ev.target.id.slice(0,2)=='a-')auth('go')});
+if(me){role=me.role;cid=(mine()[0]||{}).id||0;tt=role=='t'?'clients':'workout'}
+const MK=['id','tid','uid','email','name','invite','plan','diet'],DK=['logs','food','weights','mins'];
+const pick=(o,ks)=>{const r={};ks.forEach(k=>{r[k]=o[k]===undefined?null:o[k]});return r};
+const clone=o=>JSON.parse(JSON.stringify(o));
+function cloudErr(e){const m='Could not save your last change ('+((e&&e.code)||'error')+'). If you can only view this page, ask the owner to give you Contributor access.';bn=m;amsg=m;render()}
+function put(path,obj){const j=JSON.stringify(obj);if(sy[path]===j)return;sy[path]=j;wq[path]=(wq[path]||Promise.resolve()).then(()=>db.doc(path).set(JSON.parse(j))).catch(e=>{sy[path]=null;cloudErr(e)})}
+function cloudSave(){if(!me)return;mine().forEach(c=>{put('clients/'+c.id,pick(c,MK));put('cdata/'+c.id,pick(c,DK))})}
+function setupHtml(){const v=k=>esc(af[k]||'');return`<header><div class="brand"><span class="plate"></span>PlateLog</div></header>
+<div class="card" style="max-width:440px;margin:24px auto"><h2>Set up your account</h2>
+<div class="pills" style="margin-top:12px"><button class="pill ${ar=='t'?'on':''}" data-a="ar" data-v="t">I’m a trainer</button><button class="pill ${ar=='c'?'on':''}" data-a="ar" data-v="c">I’m a client</button></div>
+<p><label>Your name<br><input id="a-n" value="${v('a-n')}" style="width:100%" autocomplete="name"></label></p>
+${ar=='c'?`<p><label>Invite code from your trainer<br><input id="a-c" value="${v('a-c')}" style="width:100%;text-transform:uppercase" autocomplete="off"></label></p>`:'<p class="mut">After this you can add clients and give each one an invite code.</p>'}
+${amsg?`<p role="alert" style="color:var(--bad)">${esc(amsg)}</p>`:''}
+<button class="btn" style="width:100%" data-a="go">Continue</button>
+<p class="mut">You are signed in through claude.ai, so there is no separate password. Your data is saved on the server and shared with the trainer or clients you link to.</p></div>`}
+function cloudOut(){const c=me.role=='c'?C():null;if(c){c.uid=null;c.invite=mkcode();put('clients/'+c.id,pick(c,MK))}
+ (c?wq['clients/'+c.id]:Promise.resolve()).then(()=>db.doc('profiles/'+uid).delete()).then(()=>{af={};amsg='';bn='';ar='t'}).catch(cloudErr)}
+function sync(){if(!(got.p&&got.c&&got.d))return;loading=false;
+ S.users=Object.keys(P).map(id=>Object.assign({id},P[id]));
+ const p=P[uid];me=p?{id:uid,role:p.role,name:p.name}:null;
+ S.clients=Object.keys(CM).map(id=>Object.assign({},CM[id],DM[id]||{logs:[],food:[],weights:[{d:TODAY,v:70}],mins:45}));
+ S.clients.forEach(c=>{sy['clients/'+c.id]=JSON.stringify(pick(c,MK));sy['cdata/'+c.id]=JSON.stringify(pick(c,DK))});
+ if(!me)ini=false;
+ if(me&&!ini){ini=true;role=me.role;tt=role=='t'?'clients':'workout';ct='today'}
+ if(me&&!mine().some(x=>x.id==cid))cid=(mine()[0]||{}).id||0;
+ const sig=JSON.stringify([S.users,S.clients,me]);if(sig==lastSig)return;lastSig=sig;
+ const a=document.activeElement;if(me&&a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pend=true;return}render()}
+async function boot(){
+ if(!(typeof window!=='undefined'&&window.claude&&window.claude.use)){render();return}
+ document.getElementById('app').innerHTML='<p class="mut" style="padding:24px">Loading…</p>';
+ try{db=await claude.use('db');const u=await claude.use('user');uid=u?await u.id():null}catch(e){db=null}
+ if(!db||!uid){db=null;render();return}
+ cloud=true;me=null;S={users:[],clients:[]};
+ const bad=e=>{loading=false;cloudErr(e)};
+ db.collection('profiles').onSnapshot(q=>{P={};q.docs.forEach(d=>{P[d.id]=clone(d.data())});got.p=1;sync()},bad);
+ db.collection('clients').onSnapshot(q=>{CM={};q.docs.forEach(d=>{CM[d.id]=clone(d.data())});got.c=1;sync()},bad);
+ db.collection('cdata').onSnapshot(q=>{DM={};q.docs.forEach(d=>{DM[d.id]=clone(d.data())});got.d=1;sync()},bad);
+ setTimeout(()=>{if(loading){loading=false;render()}},10000)}
+document.addEventListener('focusout',()=>{if(pend){pend=false;setTimeout(render,60)}});
+boot();
+</script>
+</body>
+</html>

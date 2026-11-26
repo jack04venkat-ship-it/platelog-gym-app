@@ -1,0 +1,18 @@
+{
+  "name": "PlateLog Gym",
+  "short_name": "PlateLog",
+  "description": "Trainer and client workout, diet, and progress tracking.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ECEEE9",
+  "theme_color": "#27455C",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
