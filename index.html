@@ -63,8 +63,10 @@ footer{text-align:center;margin:20px 0}
 </head>
 <body>
 <main id="app"></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const KEY='platelog4',DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],FULL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const SUPABASE_URL='https://wcyaihusjdznreycpbma.supabase.co',SUPABASE_KEY='sb_publishable_D-NT55k8aufF-MKJaSFB1A_pKRbSfXY';
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],FULL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const ago=n=>{const d=new Date();d.setDate(d.getDate()-n);return iso(d)};
 const TODAY=iso(new Date()),TI=(new Date().getDay()+6)%7,TD=DAYS[TI];
@@ -257,8 +259,8 @@ const fsHtml=()=>{if(pk)return`<div class="set"><span style="flex:1"><b>${esc(pk
 const vopts=(n,q)=>vars(n).map(a=>`<option ${a.v==(q||vars(n)[0].v)?'selected':''}>${a.v}</option>`).join('');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hp=s=>{let h=5381;for(const ch of 'pl$'+s)h=((h<<5)+h+ch.charCodeAt(0))|0;return 'h'+(h>>>0).toString(36)};
-const mkcode=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let r='';for(let i=0;i<6;i++)r+=a[Math.floor(Math.random()*a.length)];return r};
-function newClient(tid,name,email,wt,inv){const p={};DAYS.forEach(d=>p[d]=[]);return{id:Date.now()+Math.floor(Math.random()*1e4),tid,uid:null,email,name,invite:inv||mkcode(),mins:45,plan:p,diet:{kcal:2200,protein:120,note:''},logs:[],food:[],weights:[{d:TODAY,v:wt}]}}
+const mkcode=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r=new Uint32Array(6);crypto.getRandomValues(r);return Array.from(r,x=>a[x%a.length]).join('')};
+function newClient(tid,name,email,wt,inv){const p={};DAYS.forEach(d=>p[d]=[]);return{id:crypto.randomUUID(),tid,uid:null,email,name,invite:inv||mkcode(),mins:45,plan:p,diet:{kcal:2200,protein:120,note:''},logs:[],food:[],weights:[{d:TODAY,v:wt}],_new:true,_needsData:true}}
 function seed(){
  const logs=[];
  for(let k=1;k<=6;k++){logs.push({d:ago(k*3),ex:'Bench Press',q:'Barbell',s:1,r:8,w:60-k*2.5},{d:ago(k*3),ex:'Squat',q:'Back Squat',s:1,r:8,w:80-k*5})}
@@ -273,13 +275,13 @@ function seed(){
   diet:{kcal:1700,protein:100,note:'Add one fruit and one curd serving daily.'},
   logs:[{d:ago(2),ex:'Hip Thrust',q:'Barbell',s:1,r:10,w:45},{d:ago(9),ex:'Hip Thrust',q:'Barbell',s:1,r:10,w:42.5},{d:ago(16),ex:'Hip Thrust',q:'Barbell',s:1,r:10,w:40}],food:[],
   weights:[[28,64.5],[14,63.8],[2,63.2]].map(a=>({d:ago(a[0]),v:a[1]}))},newClient('u1','Karthik S','karthik@demo.com',78,'KARTH7')]};}
-let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
-if(!S||!S.users)S=seed();
-const save=()=>{if(cloud)return cloudSave();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
-let me=null;try{me=S.users.find(u=>u.id==localStorage.getItem(KEY+'-me'))||null}catch(e){}
+let S={users:[],clients:[]};
+const save=()=>{if(cloud&&me)saveQueue=saveQueue.then(cloudSave)};
+let me=null;
 let am='in',ar='t',amsg='',af={};
-let cloud=false,db=null,uid=null,loading=true,bn='',lastSig='',pend=false,ini=false,lo=false,P={},CM={},DM={},got={};const sy={},wq={};
-let role='t',cid=0,tt='clients',ct='today',day=TD,draft={};
+let cloud=false,sb=null,authUser=null,loading=true,bn='',lastSig='',pend=false,ini=false,lo=false,refreshTimer=0;
+const persisted=new Map();let saveQueue=Promise.resolve();
+let role='t',cid='',tt='clients',ct='today',day=TD,draft={};
 const mine=()=>S.clients.filter(x=>me.role=='t'?x.tid==me.id:x.uid==me.id);
 const C=()=>mine().find(x=>x.id==cid)||mine()[0];
 const bw=c=>c.weights[c.weights.length-1].v;
@@ -321,7 +323,7 @@ function trainer(){const c=C();if(!c||tt=='clients')return tabs(TT,'clients')+cl
   ${done<2&&planned?`<div class="card" style="border-color:var(--bad)"><b>Low adherence.</b> ${esc(c.name)} has trained ${done} of ${planned} planned days this week.</div>`:''}`}
  return h}
 
-function client(){const c=C();if(!c)return'<p class="mut">No trainer is linked to this account yet. Ask your trainer for an invite code.</p>';let h=tabs([['today','Today'],['food','Food'],['me','Progress']],ct);
+function client(){const c=C();if(!c)return`<div class="card"><h3>No trainer linked</h3><p class="mut">Ask your trainer for an invite code, then enter it here.</p><div class="row"><input id="link-code" placeholder="Invite code" style="text-transform:uppercase"><button class="btn" data-a="link">Link trainer</button></div></div>`;let h=tabs([['today','Today'],['food','Food'],['me','Progress']],ct);
  if(ct=='today'){const L=c.plan[TD]||[];h+=`<h2>${FULL[TI]}</h2>`;
   if(!L.length)h+='<p class="mut">Rest day. Log your food and weight instead.</p>';
   const sr=(i,s,nm)=>{const e=L[i],lg=c.logs.find(l=>l.d==TODAY&&l.ex==e.n&&l.q==e.q&&l.s==s),k=i+'-'+s,lab=nm?`<span class="sn" style="flex:1;min-width:130px">${esc(e.n)}, set ${s}</span>`:`<span class="sn">${isC(e.n)?'Session':'Set '+s}</span>`;
@@ -342,10 +344,11 @@ function client(){const c=C();if(!c)return'<p class="mut">No trainer is linked t
  if(ct=='me')h+=`<div class="card"><h3>Update body weight</h3><div class="row" style="margin-top:8px"><input type="number" step="0.1" id="bw" value="${bw(c)}"> kg <button class="btn" data-a="weight">Save weight</button></div>${spark(c.weights.map(w=>w.v))}</div><div class="card"><h3>Your lifts</h3>${liftsHtml(c)}</div>`;
  return h}
 
-function render(){if(!me){document.getElementById('app').innerHTML=authHtml();return}document.getElementById('app').innerHTML=head()+(role=='t'?trainer():client())+(cloud?'':'<footer><button class="btn ghost" data-a="reset">Reset demo data</button></footer>')}
-document.addEventListener('click',ev=>{const b=ev.target.closest('[data-a]');if(!b)return;if(!me){auth(b.dataset.a,b.dataset.v);return}const a=b.dataset.a,c=C(),v=b.dataset.v;
- if(a=='logout'){if(cloud){if(!lo){lo=true;render();return}lo=false;cloudOut();return}me=null;try{localStorage.removeItem(KEY+'-me')}catch(e){}}
- else if(a=='open'){cid=+v;tt='workout'}
+function render(){if(!me){document.getElementById('app').innerHTML=authHtml();return}document.getElementById('app').innerHTML=head()+(role=='t'?trainer():client())}
+document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-a]');if(!b)return;if(!me){await auth(b.dataset.a,b.dataset.v);return}const a=b.dataset.a,c=C(),v=b.dataset.v;
+ if(a=='logout'){if(!lo){lo=true;render();return}lo=false;const{error}=await sb.auth.signOut();if(error){cloudErr(error);return}me=null;authUser=null;S={users:[],clients:[]};ini=false;lastSig='';render();return}
+ else if(a=='link'){const code=(document.getElementById('link-code').value||'').trim().toUpperCase();if(!code)return;try{const{error}=await sb.rpc('redeem_invite',{invite_code:code});if(error)throw error;const{error:metadataError}=await sb.auth.updateUser({data:{invite_code:null}});if(metadataError)throw metadataError;bn='';amsg='';await loadCloud()}catch(e){bn=e.message;amsg=e.message;render()}return}
+ else if(a=='open'){cid=v;tt='workout'}
  else if(a=='copy'){try{navigator.clipboard.writeText(v)}catch(e){}b.textContent='Copied';return}
  else if(a=='addc'){const n=document.getElementById('nc-n').value.trim();if(!n)return;const k=newClient(me.id,n,document.getElementById('nc-e').value.trim().toLowerCase(),+document.getElementById('nc-w').value||70);S.clients.push(k);if(!cid)cid=k.id}
  else if(a=='tab'){role=='t'?tt=v:ct=v}
@@ -360,10 +363,9 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-a]');if(
  else if(a=='addd'){if(!pk||!(pk.q>0))return;c.food.push({d:TODAY,n:pk.d[0]+' ('+pk.q+' × '+pk.d[2]+')',k:Math.round(pk.d[1]*pk.q)});pk=null;fqv=''}
  else if(a=='rmfood')c.food.splice(+b.dataset.i,1);
  else if(a=='weight'){const x=+document.getElementById('bw').value;if(!(x>0))return;const l=c.weights[c.weights.length-1];l.d==TODAY?l.v=x:c.weights.push({d:TODAY,v:x})}
- else if(a=='reset'){S=seed();draft={};me=null;try{localStorage.removeItem(KEY+'-me')}catch(e){}}
  save();render()});
 document.addEventListener('change',ev=>{const t=ev.target,f=t.dataset.f;if(!f||!me)return;const c=C();
- if(f=='pick'){cid=+t.value;draft={};render();return}
+ if(f=='pick'){cid=t.value;draft={};render();return}
  if(f=='addex'){if(!t.value)return;(c.plan[day]=c.plan[day]||[]).push(isC(t.value)?E(t.value,1,20,0,vars(t.value)[0].v):E(t.value,3,10,0,vars(t.value)[0].v));save();render();return}
  if(f=='ex'){const e=c.plan[day][+t.dataset.i],k=t.dataset.k;if(k=='n'){const was=isC(e.n);e.n=t.value;e.q=vars(e.n)[0].v;if(was!=isC(e.n)){e.s=isC(e.n)?1:3;e.r=isC(e.n)?20:10;e.w=0}save();render();return}if(k=='q'){e.q=t.value;save();render();return}e[k]=+t.value}
  else if(f=='ss'){c.plan[day][+t.dataset.i].ss=t.checked;save();render();return}
@@ -379,7 +381,10 @@ function clientsHtml(){const cs=mine();
 return`<div class="card"><h3>Add a client</h3><p class="mut">You get an invite code for each client. They choose “I’m a client” on the sign-up page and enter the code to link their account to you.</p>
 <div class="row" style="margin-top:8px;flex-wrap:wrap"><input class="n" id="nc-n" placeholder="Client name" style="min-width:150px"><input id="nc-e" type="email" placeholder="Email (optional)" style="min-width:150px"><input type="number" id="nc-w" step="0.1" placeholder="Weight kg" style="width:110px"><button class="btn" data-a="addc">Add client</button></div></div>
 ${cs.map(x=>`<div class="card"><div class="row" style="flex-wrap:wrap"><div class="n"><b>${esc(x.name)}</b><div class="mut">${x.uid?'Connected':'Invite pending'}${x.email?', '+esc(x.email):''}</div></div>${x.uid?'':`<span class="big" style="font-size:28px">${x.invite}</span><button class="btn ghost" data-a="copy" data-v="${x.invite}">Copy code</button>`}<button class="btn" data-a="open" data-v="${x.id}">Open</button></div></div>`).join('')||'<p class="mut">No clients yet. Add your first client above.</p>'}`}
-function authHtml(){if(cloud)return loading?'<p class="mut" style="padding:24px">Loading your data…</p>':setupHtml();const v=k=>esc(af[k]||'');return`<header><div class="brand"><span class="plate"></span>PlateLog</div></header>
+function authHtml(){
+ if(!cloud)return`<header><div class="brand"><span class="plate"></span>PlateLog</div></header><div class="card" style="max-width:560px;margin:24px auto"><h2>Connect Supabase</h2><p>This app needs your Supabase project URL and publishable key before it can save shared data. Run the SQL in <b>supabase-setup.sql</b>, then replace the two configuration placeholders near the top of index.html. Never use a service-role key in this app.</p></div>`;
+ if(loading)return'<p class="mut" style="padding:24px">Connecting to Supabase…</p>';
+ const v=k=>esc(af[k]||'');return`<header><div class="brand"><span class="plate"></span>PlateLog</div></header>
 <div class="card" style="max-width:440px;margin:24px auto"><div class="tabs"><button data-a="am" data-v="in" class="${am=='in'?'on':''}">Log in</button><button data-a="am" data-v="up" class="${am=='up'?'on':''}">Sign up</button></div>
 ${am=='up'?`<div class="pills"><button class="pill ${ar=='t'?'on':''}" data-a="ar" data-v="t">I’m a trainer</button><button class="pill ${ar=='c'?'on':''}" data-a="ar" data-v="c">I’m a client</button></div><p><label>Name<br><input id="a-n" value="${v('a-n')}" style="width:100%" autocomplete="name"></label></p>`:''}
 <p><label>Email<br><input id="a-e" type="email" value="${v('a-e')}" style="width:100%" autocomplete="email"></label></p>
@@ -387,66 +392,138 @@ ${am=='up'?`<div class="pills"><button class="pill ${ar=='t'?'on':''}" data-a="a
 ${am=='up'&&ar=='c'?`<p><label>Invite code from your trainer<br><input id="a-c" value="${v('a-c')}" style="width:100%;text-transform:uppercase" autocomplete="off"></label></p>`:''}
 ${amsg?`<p role="alert" style="color:var(--bad)">${esc(amsg)}</p>`:''}
 <button class="btn" style="width:100%" data-a="go">${am=='in'?'Log in':'Create account'}</button>
-<hr style="border:0;border-top:1px solid var(--line);margin:18px 0"><p class="mut">Try the demo (password demo123). To test linking, sign up as a client with code KARTH7.</p><div class="row"><button class="btn ghost" data-a="demo" data-v="coach@demo.com">Demo trainer</button><button class="btn ghost" data-a="demo" data-v="aarav@demo.com">Demo client</button></div>
-<p class="mut">Accounts in this prototype live in this browser only. A real launch needs a server so trainers and clients on different phones can connect.</p></div>`}
-function enter(u){me=u;try{localStorage.setItem(KEY+'-me',u.id)}catch(e){}role=u.role;cid=(mine()[0]||{}).id||0;tt=role=='t'?'clients':'workout';ct='today';draft={};af={};amsg='';save();render()}
-function auth(a,v){const fail=m=>{amsg=m;af['a-p']='';render()};
- if(cloud){if(a=='ar'){ar=v;amsg='';render()}
-  else if(a=='go'){const n=(af['a-n']||'').trim();if(!n)return fail('Enter your name.');let cl=null;
-   if(ar=='c'){const code=(af['a-c']||'').trim().toUpperCase();cl=S.clients.find(x=>x.invite==code&&!x.uid);if(!cl)return fail('That invite code is not valid or was already used. Ask your trainer for the code.')}
-   if(cl){cl.uid=uid;cl.invite=null;put('clients/'+cl.id,pick(cl,MK))}(cl?wq['clients/'+cl.id]:Promise.resolve()).then(()=>db.doc('profiles/'+uid).set({role:ar,name:n})).catch(cloudErr)}
-  return}
- if(a=='am'){am=v;amsg='';render()}
- else if(a=='ar'){ar=v;amsg='';render()}
- else if(a=='demo'){const u=S.users.find(x=>x.email==v);if(u)enter(u)}
- else if(a=='go'){const e=(af['a-e']||'').trim().toLowerCase(),p=af['a-p']||'';
-  if(am=='in'){const u=S.users.find(x=>x.email==e&&x.pw==hp(p));return u?enter(u):fail('Email or password is incorrect.')}
-  const n=(af['a-n']||'').trim();
-  if(!n||!e||p.length<6)return fail('Enter your name, an email, and a password of at least 6 characters.');
-  if(S.users.some(x=>x.email==e))return fail('That email already has an account. Log in instead.');
-  let cl=null;
-  if(ar=='c'){const code=(af['a-c']||'').trim().toUpperCase();cl=S.clients.find(x=>x.invite==code&&!x.uid);if(!cl)return fail('That invite code is not valid or was already used. Ask your trainer for the code.')}
-  const u={id:'u'+Date.now(),role:ar,name:n,email:e,pw:hp(p)};S.users.push(u);if(cl){cl.uid=u.id;cl.invite=null}enter(u)}}
+<p class="mut">Your account and shared workout data are stored in Supabase.</p></div>`}
+async function auth(a,v){
+ const fail=m=>{amsg=m;af['a-p']='';render()};
+ if(a=='am'){am=v;amsg='';render();return}
+ if(a=='ar'){ar=v;amsg='';render();return}
+ if(a!='go')return;
+ const email=(af['a-e']||'').trim().toLowerCase(),password=af['a-p']||'';
+ if(!email||!password)return fail('Enter your email and password.');
+ try{
+  if(am=='in'){
+   const{data,error}=await sb.auth.signInWithPassword({email,password});
+   if(error)throw error;
+   await enterSession(data.user);
+  }else{
+   const name=(af['a-n']||'').trim(),invite=(af['a-c']||'').trim().toUpperCase();
+   if(!name)return fail('Enter your name.');
+   if(password.length<6)return fail('Use a password with at least 6 characters.');
+   if(ar=='c'&&!invite)return fail('Enter the invite code from your trainer.');
+   const{data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:window.location.origin+window.location.pathname,data:{name,role:ar,invite_code:ar=='c'?invite:null}}});
+   if(error)throw error;
+   if(data.session)await enterSession(data.user);
+   else{am='in';amsg='Check your email to confirm your account, then log in. If you signed up as a client, your invite code will be applied after confirmation.';render()}
+  }
+ }catch(e){if(me)cloudErr(e);else fail(e.message||'Authentication failed. Please try again.')}
+}
+async function enterSession(user){
+ authUser=user;
+ const{data:profile,error}=await sb.from('profiles').select('id,role,name').eq('id',user.id).single();
+ if(error)throw error;
+ if(!profile)throw new Error('Your account profile is missing. Run the Supabase setup SQL and try again.');
+ me={id:profile.id,role:profile.role,name:profile.name,email:user.email};
+ if(me.role=='c'&&user.user_metadata.invite_code){
+  const{error:linkError}=await sb.rpc('redeem_invite',{invite_code:user.user_metadata.invite_code});
+  if(!linkError){
+   const{error:metadataError}=await sb.auth.updateUser({data:{invite_code:null}});
+   if(metadataError)throw metadataError;
+  }else{amsg='Account created, but the invite code could not be linked. Enter a valid code below.';bn=amsg}
+ }
+ role=me.role;tt=role=='t'?'clients':'workout';ct='today';draft={};af={};lo=false;
+ await loadCloud();
+}
 document.addEventListener('keydown',ev=>{if(ev.key=='Enter'&&!me&&ev.target.id&&ev.target.id.slice(0,2)=='a-')auth('go')});
-if(me){role=me.role;cid=(mine()[0]||{}).id||0;tt=role=='t'?'clients':'workout'}
-const MK=['id','tid','uid','email','name','invite','plan','diet'],DK=['logs','food','weights','mins'];
-const pick=(o,ks)=>{const r={};ks.forEach(k=>{r[k]=o[k]===undefined?null:o[k]});return r};
 const clone=o=>JSON.parse(JSON.stringify(o));
-function cloudErr(e){const m='Could not save your last change ('+((e&&e.code)||'error')+'). If you can only view this page, ask the owner to give you Contributor access.';bn=m;amsg=m;render()}
-function put(path,obj){const j=JSON.stringify(obj);if(sy[path]===j)return;sy[path]=j;wq[path]=(wq[path]||Promise.resolve()).then(()=>db.doc(path).set(JSON.parse(j))).catch(e=>{sy[path]=null;cloudErr(e)})}
-function cloudSave(){if(!me)return;mine().forEach(c=>{put('clients/'+c.id,pick(c,MK));put('cdata/'+c.id,pick(c,DK))})}
-function setupHtml(){const v=k=>esc(af[k]||'');return`<header><div class="brand"><span class="plate"></span>PlateLog</div></header>
-<div class="card" style="max-width:440px;margin:24px auto"><h2>Set up your account</h2>
-<div class="pills" style="margin-top:12px"><button class="pill ${ar=='t'?'on':''}" data-a="ar" data-v="t">I’m a trainer</button><button class="pill ${ar=='c'?'on':''}" data-a="ar" data-v="c">I’m a client</button></div>
-<p><label>Your name<br><input id="a-n" value="${v('a-n')}" style="width:100%" autocomplete="name"></label></p>
-${ar=='c'?`<p><label>Invite code from your trainer<br><input id="a-c" value="${v('a-c')}" style="width:100%;text-transform:uppercase" autocomplete="off"></label></p>`:'<p class="mut">After this you can add clients and give each one an invite code.</p>'}
-${amsg?`<p role="alert" style="color:var(--bad)">${esc(amsg)}</p>`:''}
-<button class="btn" style="width:100%" data-a="go">Continue</button>
-<p class="mut">You are signed in through claude.ai, so there is no separate password. Your data is saved on the server and shared with the trainer or clients you link to.</p></div>`}
-function cloudOut(){const c=me.role=='c'?C():null;if(c){c.uid=null;c.invite=mkcode();put('clients/'+c.id,pick(c,MK))}
- (c?wq['clients/'+c.id]:Promise.resolve()).then(()=>db.doc('profiles/'+uid).delete()).then(()=>{af={};amsg='';bn='';ar='t'}).catch(cloudErr)}
-function sync(){if(!(got.p&&got.c&&got.d))return;loading=false;
- S.users=Object.keys(P).map(id=>Object.assign({id},P[id]));
- const p=P[uid];me=p?{id:uid,role:p.role,name:p.name}:null;
- S.clients=Object.keys(CM).map(id=>Object.assign({},CM[id],DM[id]||{logs:[],food:[],weights:[{d:TODAY,v:70}],mins:45}));
- S.clients.forEach(c=>{sy['clients/'+c.id]=JSON.stringify(pick(c,MK));sy['cdata/'+c.id]=JSON.stringify(pick(c,DK))});
- if(!me)ini=false;
- if(me&&!ini){ini=true;role=me.role;tt=role=='t'?'clients':'workout';ct='today'}
- if(me&&!mine().some(x=>x.id==cid))cid=(mine()[0]||{}).id||0;
- const sig=JSON.stringify([S.users,S.clients,me]);if(sig==lastSig)return;lastSig=sig;
- const a=document.activeElement;if(me&&a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pend=true;return}render()}
+function cloudErr(e){const details=e&&e.message?e.message:(e&&e.code)||'Unknown error';amsg='Could not save or load data: '+details;bn=amsg;render()}
+async function cloudSave(){
+ if(!me)return;
+ try{
+  for(const c of mine()){
+   const signature=JSON.stringify([c.name,c.email,c.invite,c.plan,c.diet,c.logs,c.food,c.weights,c.mins]);
+   if(persisted.get(c.id)===signature)continue;
+   if(me.role=='t'){
+    const fields={email:c.email,name:c.name,invite:c.invite,plan:c.plan,diet:c.diet};
+    let result;
+    if(c._new){
+     result=await sb.from('clients').insert({id:c.id,tid:me.id,...fields});
+     if(result.error)throw result.error;
+     c._new=false;
+    }else{
+     result=await sb.from('clients').update(fields).eq('id',c.id).eq('tid',me.id);
+     if(result.error)throw result.error;
+    }
+    if(c._needsData){
+     const{error:dataError}=await sb.from('client_data').insert({client_id:c.id,logs:c.logs,food:c.food,weights:c.weights,mins:c.mins});
+     if(dataError)throw dataError;
+     c._needsData=false;
+    }
+   }else{
+    const{error}=await sb.from('client_data').upsert({client_id:c.id,logs:c.logs,food:c.food,weights:c.weights,mins:c.mins},{onConflict:'client_id'});
+    if(error)throw error;
+   }
+   persisted.set(c.id,signature);
+  }
+ }catch(e){cloudErr(e)}
+}
+function scheduleRefresh(){
+ if(!me)return;
+ const active=document.activeElement;
+ if(active&&/^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName)){pend=true;return}
+ clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>loadCloud().catch(cloudErr),200);
+}
+async function loadCloud(){
+ if(!sb||!authUser)return;
+ const[profiles,clients,data]=await Promise.all([
+  sb.from('profiles').select('id,role,name'),
+  sb.from('clients').select('id,tid,uid,email,name,invite,plan,diet'),
+  sb.from('client_data').select('client_id,logs,food,weights,mins')
+ ]);
+ if(profiles.error)throw profiles.error;
+ if(clients.error)throw clients.error;
+ if(data.error)throw data.error;
+ S.users=profiles.data||[];
+ const byId=new Map((data.data||[]).map(row=>[row.client_id,row]));
+ S.clients=(clients.data||[]).map(row=>{
+  const d=byId.get(row.id)||{};
+  return Object.assign({},row,{
+   plan:row.plan||{},diet:row.diet||{kcal:2200,protein:120,note:''},
+   logs:d.logs||[],food:d.food||[],weights:d.weights&&d.weights.length?d.weights:[{d:TODAY,v:70}],
+   mins:d.mins||45,_new:false,_needsData:false
+  });
+ persisted.clear();S.clients.forEach(c=>persisted.set(c.id,JSON.stringify([c.name,c.email,c.invite,c.plan,c.diet,c.logs,c.food,c.weights,c.mins])));
+ });
+ const profile=S.users.find(x=>x.id==authUser.id);
+ if(!profile)throw new Error('Your account profile is missing. Run the Supabase setup SQL and try again.');
+ me={id:profile.id,role:profile.role,name:profile.name,email:authUser.email};
+ role=me.role;
+ if(!ini){tt=role=='t'?'clients':'workout';ct='today';ini=true}
+ if(!mine().some(x=>x.id==cid))cid=(mine()[0]||{}).id||'';
+ loading=false;
+ const sig=JSON.stringify([S.users,S.clients,me]);
+ if(sig==lastSig)return;
+ lastSig=sig;
+ const active=document.activeElement;
+ if(active&&/^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName)){pend=true;return}
+ render();
+}
 async function boot(){
- if(!(typeof window!=='undefined'&&window.claude&&window.claude.use)){render();return}
- document.getElementById('app').innerHTML='<p class="mut" style="padding:24px">Loading…</p>';
- try{db=await claude.use('db');const u=await claude.use('user');uid=u?await u.id():null}catch(e){db=null}
- if(!db||!uid){db=null;render();return}
- cloud=true;me=null;S={users:[],clients:[]};
- const bad=e=>{loading=false;cloudErr(e)};
- db.collection('profiles').onSnapshot(q=>{P={};q.docs.forEach(d=>{P[d.id]=clone(d.data())});got.p=1;sync()},bad);
- db.collection('clients').onSnapshot(q=>{CM={};q.docs.forEach(d=>{CM[d.id]=clone(d.data())});got.c=1;sync()},bad);
- db.collection('cdata').onSnapshot(q=>{DM={};q.docs.forEach(d=>{DM[d.id]=clone(d.data())});got.d=1;sync()},bad);
- setTimeout(()=>{if(loading){loading=false;render()}},10000)}
-document.addEventListener('focusout',()=>{if(pend){pend=false;setTimeout(render,60)}});
+ const configured=SUPABASE_URL.startsWith('https://')&&!SUPABASE_URL.includes('YOUR_')&&SUPABASE_KEY&&!SUPABASE_KEY.includes('YOUR_');
+ if(!configured||!window.supabase){loading=false;render();return}
+ try{
+  sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+  cloud=true;
+  const{data,error}=await sb.auth.getSession();
+  if(error)throw error;
+  if(data.session)await enterSession(data.session.user);
+  else{loading=false;render()}
+  sb.channel('platelog-sync')
+   .on('postgres_changes',{event:'*',schema:'public',table:'clients'},scheduleRefresh)
+   .on('postgres_changes',{event:'*',schema:'public',table:'client_data'},scheduleRefresh)
+   .subscribe();
+ }catch(e){loading=false;cloudErr(e)}
+}
+document.addEventListener('focusout',()=>{if(pend){pend=false;setTimeout(()=>loadCloud().catch(cloudErr),60)}});
 boot();
 </script>
 <script>

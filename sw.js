@@ -1,4 +1,4 @@
-const CACHE = "platelog-v1";
+const CACHE = "platelog-v2-supabase";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", event => {
